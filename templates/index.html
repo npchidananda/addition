@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Watch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --card-border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --gain: #16a34a;
+      --loss: #dc2626;
+      --accent: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Sora", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(217, 119, 6, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(22, 163, 74, 0.06), transparent);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .indices, .stocks {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-1px);
+      border-color: rgba(217, 119, 6, 0.4);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .card-name {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .card-values {
+      text-align: right;
+    }
+
+    .card-price {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .card-change {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.85rem;
+      margin-top: 0.2rem;
+    }
+
+    .card-change.positive { color: var(--gain); }
+    .card-change.negative { color: var(--loss); }
+    .card-change.neutral { color: var(--muted); }
+
+    .refresh {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    button {
+      font-family: "Sora", sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.6rem 1.25rem;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: var(--bg);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading, .error {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+    }
+
+    .error { color: var(--loss); }
+
+    .pulse {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Market Watch</h1>
+      <p class="subtitle">Indices · Stocks</p>
+    </header>
+
+    <div id="app">
+      <div id="content" class="loading pulse">Loading…</div>
+    </div>
+
+    <div class="refresh" id="refresh-wrap" style="display: none;">
+      <button id="refresh">Refresh</button>
+    </div>
+  </div>
+
+  <script>
+    const content = document.getElementById("content");
+    const refreshWrap = document.getElementById("refresh-wrap");
+
+    function formatPrice(n) {
+      if (n == null) return "—";
+      return new Intl.NumberFormat("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
+    }
+
+    function formatChange(change, pct) {
+      if (change == null && pct == null) return null;
+      const c = change != null ? change : 0;
+      const p = pct != null ? pct : 0;
+      const sign = c >= 0 ? "+" : "";
+      return `${sign}${formatPrice(c)} (${sign}${p.toFixed(2)}%)`;
+    }
+
+    function cardHtml(i) {
+      const change = i.change;
+      const pct = i.pct;
+      const changeClass = change != null && change > 0 ? "positive" : change != null && change < 0 ? "negative" : "neutral";
+      const changeStr = formatChange(change, pct);
+      return `
+        <div class="card">
+          <span class="card-name">${escapeHtml(i.name)}</span>
+          <div class="card-values">
+            <div class="card-price">${formatPrice(i.price)}</div>
+            ${changeStr ? `<div class="card-change ${changeClass}">${changeStr}</div>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function render(data) {
+      const indices = data.indices || [];
+      const stocks = data.stocks || [];
+      const hasData = indices.length > 0 || stocks.length > 0;
+
+      if (!hasData) {
+        content.innerHTML = '<div class="error">Could not fetch data.</div>';
+      } else {
+        let html = "";
+        if (indices.length > 0) {
+          html += `<div class="section"><div class="section-title">Indices</div><div class="indices">`;
+          html += indices.map(cardHtml).join("");
+          html += `</div></div>`;
+        }
+        if (stocks.length > 0) {
+          html += `<div class="section"><div class="section-title">Stocks</div><div class="stocks">`;
+          html += stocks.map(cardHtml).join("");
+          html += `</div></div>`;
+        }
+        content.innerHTML = html;
+      }
+
+      content.classList.remove("loading", "pulse");
+      refreshWrap.style.display = "flex";
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function fetchData() {
+      try {
+        const res = await fetch("/api/indices");
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        content.innerHTML = `<div class="error">Failed to load: ${escapeHtml(e.message)}</div>`;
+        content.classList.remove("loading", "pulse");
+        refreshWrap.style.display = "flex";
+      }
+    }
+
+    document.getElementById("refresh").onclick = () => {
+      const btn = document.getElementById("refresh");
+      btn.disabled = true;
+      content.innerHTML = '<div class="loading pulse">Loading…</div>';
+      content.classList.add("loading", "pulse");
+      fetchData().finally(() => { btn.disabled = false; });
+    };
+
+    fetchData();
+  </script>
+</body>
+</html>
