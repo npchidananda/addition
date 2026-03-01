@@ -2,6 +2,8 @@
 
 Math calculator, weather, and Indian market indices.
 
+This project also includes a simple Flask-based market dashboard UI.
+
 ## Web dashboard (indices)
 
 ```bash
